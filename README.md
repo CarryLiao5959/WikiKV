@@ -1,7 +1,5 @@
 # WikiKV: A Path-Indexed Key-Value Storage Model for LLM-Curated Hierarchical Knowledge Bases
 
-**Haoliang Ming, Feifei Li, Xiaoqing Wu, Wenhui Que**
-
 This repository contains the official code release for **WikiKV**, the storage,
 deployment, and evolution layer behind LLM-curated hierarchical knowledge bases.
 WikiKV encodes each node's path verbatim as its storage key (`/dim/entity`,
@@ -12,14 +10,10 @@ parent-after-child consistency protocol with a no-partial-read guarantee, a
 path-keyed three-tier cache, and a budgeted, search-accelerated navigation
 query operator.
 
-WikiKV is the **systems/database-side** companion to the algorithm-side paper
-*Retrieval as Reasoning: Self-Evolving Agent-Native Retrieval via LLM-Wiki*
-([arXiv:2605.25480](https://arxiv.org/abs/2605.25480)). The agent-native
-retrieval behavior and the content-level **Error Book** are inherited from that
-work; the contributions implemented here are the storage encoding, the
-consistency protocol, the cache, and the schema cold-start / evolution pipeline.
-
-> **Paper (arXiv):** see [`arxiv.txt`](./arxiv.txt).
+WikiKV focuses on the **systems/storage** side of hierarchical knowledge-base
+construction and retrieval. The core contributions implemented here are the
+path-indexed storage encoding, the parent-after-child consistency protocol,
+path-keyed caching, and the schema cold-start / evolution pipeline.
 
 ---
 
@@ -30,7 +24,6 @@ release/
 ├── README.md
 ├── LICENSE
 ├── requirements.txt
-├── arxiv.txt
 ├── Dockerfile / build_img.sh     # containerized deployment
 ├── configs/
 │   ├── page_types.yaml           # default page-type catalog
@@ -136,23 +129,6 @@ WikiKV uses a fixed four-level path schema with five node types
 (`Index → Dimension → Entity → {Digest, Document}`); see
 [`configs/wiki-schema.md`](./configs/wiki-schema.md) and
 [`docs/architecture.md`](./docs/architecture.md) for the full specification.
-
-## Citation
-
-If you find this code useful, please cite the WikiKV paper (see `arxiv.txt`)
-and the companion LLM-Wiki paper:
-
-```bibtex
-@misc{ming2026retrievalreasoningselfevolvingagentnative,
-      title={Retrieval as Reasoning: Self-Evolving Agent-Native Retrieval via LLM-Wiki},
-      author={Haoliang Ming and Feifei Li and Xiaoqing Wu and Wenhui Que},
-      year={2026},
-      eprint={2605.25480},
-      archivePrefix={arXiv},
-      primaryClass={cs.CL},
-      url={https://arxiv.org/abs/2605.25480},
-}
-```
 
 ## License
 
