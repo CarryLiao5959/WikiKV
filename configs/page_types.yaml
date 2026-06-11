@@ -1,0 +1,20 @@
+# 知识页类型注册表
+# LLM 可在摄入时提议扩展新类型（通过 proposed_page_types 字段）
+# 新类型会自动追加到此文件并创建对应目录
+#
+# 每个类型的 description 会展示给 LLM，帮助它判断是否查看该目录
+# 类似 skill 的 description，是两层索引的第一层
+
+page_types:
+  entities:
+    description: 实体页 — 人物、机构、作品、地点
+    auto_created: true
+  concepts:
+    description: 概念页 — 理论、方法、流派、哲学
+    auto_created: true
+  topics:
+    description: 主题页 — 跨实体/概念的综合
+    auto_created: true
+  comparisons:
+    description: 对比分析页 — 人物对比、作品对比、方法对比
+    auto_created: false

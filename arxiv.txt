@@ -1,0 +1,18 @@
+Title : WikiKV: A Path-Indexed Key-Value Storage Model for LLM-Curated Hierarchical Knowledge Bases
+arXiv : <add WikiKV arXiv link here>
+
+This repository implements the storage, deployment, and evolution layer (WikiKV)
+of the LLM-Wiki method. For the algorithmic / retrieval-side companion paper, see:
+
+Title : Retrieval as Reasoning: Self-Evolving Agent-Native Retrieval via LLM-Wiki
+arXiv : https://arxiv.org/abs/2605.25480
+
+@misc{ming2026retrievalreasoningselfevolvingagentnative,
+      title={Retrieval as Reasoning: Self-Evolving Agent-Native Retrieval via LLM-Wiki},
+      author={Haoliang Ming and Feifei Li and Xiaoqing Wu and Wenhui Que},
+      year={2026},
+      eprint={2605.25480},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL},
+      url={https://arxiv.org/abs/2605.25480},
+}
