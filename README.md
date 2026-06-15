@@ -1,18 +1,21 @@
-# Retrieval as Reasoning: Self-Evolving Agent-Native Retrieval via LLM-Wiki
+# WikiKV: A Path-Indexed Key-Value Storage Model for LLM-Curated Hierarchical Knowledge Bases
 
-**Feifei Li, Haoliang Ming, Zihan Li, Hang Liao, Xingyu Fan, Xiaoqing Wu, Chenggong Wang, Wenhui Que**
+This repository contains the official code release for **WikiKV**, the storage,
+deployment, and evolution layer behind LLM-curated hierarchical knowledge bases.
+WikiKV encodes each node's path verbatim as its storage key (`/dim/entity`,
+`/sources/...`), so that a directory listing is served by a single point lookup
+on one directory node. On top of this storage core it provides a data-driven
+schema layer (cold-start induction plus merge/split evolution operators), a
+parent-after-child consistency protocol with a no-partial-read guarantee, a
+path-keyed three-tier cache, and a budgeted, search-accelerated navigation
+query operator.
 
-This repository
-This repository contains the official code release for **LLM-Wiki**, an
-agent-native retrieval system that operationalizes the
-*Retrieval-as-Reasoning* paradigm. LLM-Wiki compiles documents into
-structured Wiki pages with bidirectional links, exposes `wiki_search`,
-`wiki_read`, and link-following operations through standard tool-calling
-interfaces, and introduces an Error Book for persistent structural and
-semantic self-correction. It supports both offline Wiki compilation and
-online retrieval / question answering / evaluation.
+WikiKV focuses on the **systems/storage** side of hierarchical knowledge-base
+construction and retrieval. The core contributions implemented here are the
+path-indexed storage encoding, the parent-after-child consistency protocol,
+path-keyed caching, and the schema cold-start / evolution pipeline.
 
-> **Paper (arXiv):** https://arxiv.org/abs/2605.25480
+**arXiv:** [WikiKV preprint](https://arxiv.org/abs/2606.14275)
 
 ---
 
@@ -23,26 +26,35 @@ release/
 ├── README.md
 ├── LICENSE
 ├── requirements.txt
-├── arxiv.txt
+├── Dockerfile / build_img.sh     # containerized deployment
 ├── configs/
-│   ├── page_types.yaml       # default page-type catalog
-│   ├── purpose_bench.md      # default purpose template
-│   └── wiki-schema.md        # wiki schema specification
-├── llm_wiki_bench/
-│   ├── __init__.py
-│   ├── bench_config.py       # dataset paths, LLM config, wiki directory management
-│   ├── llm_client.py         # OpenAI-compatible API client (chat + tool calls)
-│   ├── download_datasets.py  # download public dev sets
-│   ├── preprocess_bench.py   # raw paragraphs → Markdown articles
-│   ├── bench_ingest.py       # two-step LLM ingestion engine
-│   ├── bench_error_book.py   # error book for self-correction
-│   ├── run.py                # offline wiki construction runner
-│   ├── wiki_retriever.py     # wiki_search + wiki_read tools
-│   ├── wiki_agent.py         # Retrieval-as-Reasoning tool-calling agent
-│   ├── run_qa.py             # end-to-end retrieval + answer runner
-│   └── evaluate.py           # EM / F1 evaluation
+│   ├── page_types.yaml           # default page-type catalog
+│   ├── purpose_template.md       # positioning descriptor P = <focus, audience, ingestion-bias>
+│   └── wiki-schema.md            # wiki schema specification
+├── docs/                         # design notes
+│   ├── architecture.md
+│   ├── wiki-schema.md
+│   ├── incr_pipeline_design.md
+│   └── CHANGELOG_v1_to_v2.md
+├── src/
+│   ├── main.py                   # CLI entry point (ingest / query / lint / maintain / finalize)
+│   ├── config.py                 # paths, LLM config, wiki-directory management
+│   ├── llm_client.py             # OpenAI-compatible chat-completion client
+│   ├── preprocess.py             # raw articles → cleaned Markdown
+│   ├── preprocess_sampled.py     # corpus sampling for cold-start
+│   ├── ingest.py                 # two-step ingestion + schema evolution (merge / split)
+│   ├── lint.py                   # structural health check + LLM contradiction detection
+│   ├── error_book.py             # cross-batch content self-correction
+│   ├── wiki_page.py              # page / path model
+│   ├── wiki_sync_kv.py           # path-as-key sync to the KV store (parent-after-child)
+│   ├── wiki_sync_wfs.py          # file-system mirror
+│   ├── init_hdfs_state.py        # storage-state bootstrap
+│   ├── incr_pipeline.py          # incremental ingestion pipeline
+│   ├── pipeline.py               # full construction pipeline
+│   ├── fetch_articles.py         # corpus fetching helper
+│   ├── pack_completed.py / reclassify_index.py / write_all_answers.py   # batch utilities
 └── examples/
-    └── run_hotpotqa.sh       # minimal reproduction example
+    └── run_demo.sh               # minimal end-to-end example
 ```
 
 ## Requirements
@@ -61,66 +73,64 @@ export OPENAI_API_KEY="sk-..."
 export OPENAI_BASE_URL="https://api.openai.com/v1"   # or your local server
 
 # Models used by the pipeline (override as needed):
-export LLM_PREMIUM_MODEL="gpt-4o"       # strong model — synthesis steps
-export LLM_FAST_MODEL="gpt-4o-mini"     # fast model  — analysis steps
+export LLM_PREMIUM_MODEL="gpt-4o"       # strong model — synthesis / generation steps
+export LLM_FAST_MODEL="gpt-4o-mini"     # fast model   — selection / analysis steps
 ```
 
-## Quickstart: build a wiki on HotpotQA
+To use the path-indexed KV backend, point WikiKV at your KV service:
 
 ```bash
-# Full pipeline (download → preprocess → ingest)
-python -m llm_wiki_bench.run --dataset hotpotqa --limit 500
-
-# Or run each stage separately:
-python -m llm_wiki_bench.run --dataset hotpotqa --only-download
-python -m llm_wiki_bench.run --dataset hotpotqa --only-preprocess --limit 500
-python -m llm_wiki_bench.run --dataset hotpotqa --only-ingest
+export WIKI_KV_API_URL="http://your-kv-host:port"
+# Optional: export WIKI_KV_PROXY_URL="http://your-proxy" if the service is not directly reachable.
 ```
 
-The compiled wiki is written to `wiki_output/<dataset>/wiki/`.
-
-## Run retrieval & answer evaluation
-
-Once a wiki has been compiled, the agent can traverse it to answer questions.
-The agent composes `wiki_search` and `wiki_read` calls, follows wikilinks,
-and checks evidence sufficiency before producing a final answer.
-
-Paper-faithful defaults: tool-call budget `T_max = 15`, patience
-`P = 3` consecutive empty searches, and at most `k = 5` pages selected per
-search.
+## Quickstart
 
 ```bash
-# 1. Generate predictions (one JSONL line per question).
-python -m llm_wiki_bench.run_qa --dataset hotpotqa --limit 500
+cd src
 
-# 2. Evaluate EM / F1 (with hop-wise and type-wise breakdowns).
-python -m llm_wiki_bench.evaluate \
-    --dataset hotpotqa \
-    --predictions results/hotpotqa/predictions.jsonl
+# 1. Place one Markdown article per file under  raw/<user>/  (or raw/articles/).
+#    Copy configs/purpose_template.md to purpose_<user>.md and fill it in.
 
-# Or do both in a single pass:
-python -m llm_wiki_bench.run_qa --dataset hotpotqa --limit 500 --evaluate
+# 2. Ingest the corpus (cold-start schema induction runs on the first batch).
+python3 main.py --user demo ingest-all --limit 500
+
+# 3. Maintenance: schema evolution (merge / split) + Error Book repair.
+python3 main.py --user demo maintain
+python3 main.py --user demo finalize --max-rounds 3
+
+# 4. Query the compiled wiki.
+python3 main.py --user demo query "What does this corpus say about X?"
+
+# 5. Health check.
+python3 main.py --user demo lint           # add --llm for contradiction detection
 ```
 
-Results (predictions, summary, per-question details) are written under
-`results/<dataset>/`.
+The compiled wiki is written to `src/<user>_wiki/wiki/`. See
+[`examples/run_demo.sh`](./examples/run_demo.sh) for the full flow.
 
-## Build a wiki on your own corpus
+## Syncing to the KV store
 
-Place one Markdown file per article under `raw/<corpus_name>/articles/`, then:
+WikiKV materializes the wiki into a path-keyed KV namespace using the
+parent-after-child write protocol:
 
-```python
-import sys
-sys.path.insert(0, "llm_wiki_bench")
-
-import bench_config as config
-import bench_ingest
-
-config.set_dataset("my_corpus")
-config.ensure_wiki_dirs()
-article_paths = sorted(config.RAW_DIR.glob("*.md"))
-bench_ingest.ingest_batch(article_paths, batch_size=3)
+```bash
+cd src
+python3 wiki_sync_kv.py --user demo --api-url "$WIKI_KV_API_URL"
 ```
+
+## Containerized deployment
+
+```bash
+bash build_img.sh        # builds the image from Dockerfile
+```
+
+## Schema model
+
+WikiKV uses a fixed four-level path schema with five node types
+(`Index → Dimension → Entity → {Digest, Document}`); see
+[`configs/wiki-schema.md`](./configs/wiki-schema.md) and
+[`docs/architecture.md`](./docs/architecture.md) for the full specification.
 
 ## Citation
 
@@ -128,13 +138,13 @@ If you find this code useful, please cite:
 
 ```bibtex
 @misc{li2026wikikvschemaevolvingpathindexedstorage,
-      title={WikiKV: Schema-Evolving Path-Indexed Storage for Hierarchical Knowledge Navigation}, 
+      title={WikiKV: Schema-Evolving Path-Indexed Storage for Hierarchical Knowledge Navigation},
       author={Feifei Li and Haoliang Ming and Zihan Li and Hang Liao and Xingyu Fan and Xiaoqing Wu and Chenggong Wang and Wenhui Que},
       year={2026},
       eprint={2606.14275},
       archivePrefix={arXiv},
       primaryClass={cs.DB},
-      url={https://arxiv.org/abs/2606.14275}, 
+      url={https://arxiv.org/abs/2606.14275},
 }
 ```
 
