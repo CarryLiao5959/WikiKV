@@ -31,11 +31,6 @@ release/
 │   ├── page_types.yaml           # default page-type catalog
 │   ├── purpose_template.md       # positioning descriptor P = <focus, audience, ingestion-bias>
 │   └── wiki-schema.md            # wiki schema specification
-├── docs/                         # design notes
-│   ├── architecture.md
-│   ├── wiki-schema.md
-│   ├── incr_pipeline_design.md
-│   └── CHANGELOG_v1_to_v2.md
 ├── src/
 │   ├── main.py                   # CLI entry point (ingest / query / lint / maintain / finalize)
 │   ├── config.py                 # paths, LLM config, wiki-directory management
@@ -129,8 +124,7 @@ bash build_img.sh        # builds the image from Dockerfile
 
 WikiKV uses a fixed four-level path schema with five node types
 (`Index → Dimension → Entity → {Digest, Document}`); see
-[`configs/wiki-schema.md`](./configs/wiki-schema.md) and
-[`docs/architecture.md`](./docs/architecture.md) for the full specification.
+[`configs/wiki-schema.md`](./configs/wiki-schema.md) for the schema specification.
 
 ## Citation
 
